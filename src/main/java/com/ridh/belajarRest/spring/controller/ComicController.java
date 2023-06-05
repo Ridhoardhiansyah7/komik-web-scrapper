@@ -3,6 +3,7 @@ package com.ridh.belajarRest.spring.controller;
 
 import com.google.gson.*;
 import com.ridh.belajarRest.spring.model.ModelDetail;
+import com.ridh.belajarRest.spring.model.ModelHome;
 import com.ridh.belajarRest.spring.model.ModelSearch;
 import com.ridh.belajarRest.spring.servies.INewUpdate;
 import com.ridh.belajarRest.spring.servies.IPopuler;
@@ -27,7 +28,6 @@ import java.util.List;
 
 @RestController
 public class ComicController implements IPopuler, INewUpdate {
-
     private final JsonObject jsonObject = new JsonObject();
     private final JsonObject rootJson = new JsonObject();
     private final Gson gson = new Gson();
@@ -43,6 +43,8 @@ public class ComicController implements IPopuler, INewUpdate {
 
         String ednpointListKomikPopuler = "/populer";
         String ednpointListKomikNewUpdate = "/update";
+        String ednpointListKomikKorea = "/manhwa?page={page}";
+        String ednpointListKomikChina = "/manhua?page={page}";
         String ednpointDetailKomik = "/detail?endpoint={endpoint}";
         String ednpointChapterKomik = "/chapter?endpoint={endpoint}";
         String ednpointSearchKomik = "/search?q={namaKomik}";
@@ -51,9 +53,11 @@ public class ComicController implements IPopuler, INewUpdate {
         listDesc.add(0,"EndPoint yg tersedia : ");
         listDesc.add(1,ednpointListKomikPopuler);
         listDesc.add(2,ednpointListKomikNewUpdate);
-        listDesc.add(3,ednpointDetailKomik);
-        listDesc.add(4,ednpointChapterKomik);
-        listDesc.add(5,ednpointSearchKomik);
+        listDesc.add(3,ednpointListKomikKorea);
+        listDesc.add(4,ednpointListKomikChina);
+        listDesc.add(5,ednpointDetailKomik);
+        listDesc.add(6,ednpointChapterKomik);
+        listDesc.add(7,ednpointSearchKomik);
 
         this.rootJson.add("list", gson.toJsonTree(listDesc));
         return this.rootJson.toString();
@@ -70,41 +74,63 @@ public class ComicController implements IPopuler, INewUpdate {
         return iNewUpdate.getItemsUpdate();
     }
 
+    @GetMapping("/manhwa")
+    private String getItemManhwa(@RequestParam("page") String page) throws IOException {
+
+        Document doc = Jsoup.connect(Endpoint.BASE_WEST_MANGA+"manga/?page="+page+"&type=manhwa")
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36")
+                .get();
+
+        List<ModelHome> listManwaList = new ArrayList<>();
+        Elements elements = doc.getElementsByClass("listupd").select(".bs");
+        for (Element listManhwa : elements.select(".bsx")){
+
+            String endpoint = listManhwa.select("a").attr("href").replace("https://westmanga.info/", "");
+            String images = listManhwa.select(".limit").select("img").attr("src");
+            String titles = listManhwa.select(".bigor").select(".tt").text();
+            String chapters = listManhwa.select(".bigor").select(".epxs").text();
+            String rating = listManhwa.select(".bigor").select(".rt").select(".numscore").text();
+
+
+            ModelHome modelHome = new ModelHome(endpoint, images, titles, chapters, rating);
+            listManwaList.add(modelHome);
+            this.jsonObject.add("data", gson.toJsonTree(listManwaList));
+        }
+
+        return this.jsonObject.toString();
+    }
+
+    @GetMapping("/manhua")
+    private String getItemManhua(@RequestParam("page") String page) throws IOException {
+
+        Document doc = Jsoup.connect(Endpoint.BASE_WEST_MANGA+"manga/?page="+page+"&type=manhua")
+                .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36")
+                .get();
+
+        List<ModelHome> listManwaList = new ArrayList<>();
+        Elements elements = doc.getElementsByClass("listupd").select(".bs");
+        for (Element listManhwa : elements.select(".bsx")){
+
+            String endpoint = listManhwa.select("a").attr("href").replace("https://westmanga.info/", "");
+            String images = listManhwa.select(".limit").select("img").attr("src");
+            String titles = listManhwa.select(".bigor").select(".tt").text();
+            String chapters = listManhwa.select(".bigor").select(".epxs").text();
+            String rating = listManhwa.select(".bigor").select(".rt").select(".numscore").text();
+
+
+            ModelHome modelHome = new ModelHome(endpoint, images, titles, chapters, rating);
+            listManwaList.add(modelHome);
+            this.jsonObject.add("data", gson.toJsonTree(listManwaList));
+        }
+
+        return this.jsonObject.toString();
+    }
+
     @GetMapping(value = "/detail")
     private String getEndpointDetail(@RequestParam("endpoint") String endpoint) throws IOException {
 
-        String modelHomesJson = iPopuler.getItems();
-        JsonObject jsonObject = JsonParser.parseString(modelHomesJson).getAsJsonObject();
-
-        JsonArray komikPopulerArray = jsonObject.getAsJsonArray("data");
-
-            for (JsonElement element : komikPopulerArray) {
-                JsonObject komikPopuler = element.getAsJsonObject();
-                String komikEndpoint = komikPopuler.get("endpoint").getAsString();
-
-                if (komikEndpoint.equals(endpoint)) {
-
-                    getDetail(endpoint);
-                    return this.jsonObject.toString();
-                }
-            }
-
-            modelHomesJson = iNewUpdate.getItemsUpdate();
-            jsonObject = JsonParser.parseString(modelHomesJson).getAsJsonObject();
-
-            komikPopulerArray = jsonObject.getAsJsonArray("data");
-
-                for (JsonElement element : komikPopulerArray) {
-                    JsonObject komikPopuler = element.getAsJsonObject();
-                    String komikEndpoint = komikPopuler.get("endpoint").getAsString();
-
-                    if (komikEndpoint.equals(endpoint)) {
-
-                        getDetail(endpoint);
-                        return this.jsonObject.toString();
-                    }
-                }
-                return null;
+        getDetail(endpoint);
+        return this.jsonObject.toString();
     }
 
     @GetMapping(value = "/search")
@@ -138,16 +164,6 @@ public class ComicController implements IPopuler, INewUpdate {
 
         WebDriver driver = new ChromeDriver(chromeOptions);
         driver.get(Endpoint.BASE_WEST_MANGA+endpoint);
-
-        /*
-        System.out.println(driver.getPageSource());
-        WebElement classReaderElement = driver.findElement(By.cssSelector(".postarea .entry-content.entry-content-single.maincontent"));
-        WebElement readerrea = classReaderElement.findElement(By.id("readerarea"));
-        System.out.println(readerrea);
-        String tes = driver.findElement(By.cssSelector(".ts-main-image.lazy.loaded")).getAttribute("src");
-        System.out.println(tes);
-
-         */
 
         for (WebElement imageHeaderList : driver.findElements(By.cssSelector(".ts-main-image.lazy.loaded"))){
             String headerImages = imageHeaderList.getAttribute("src");
